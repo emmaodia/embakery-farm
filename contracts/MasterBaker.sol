@@ -71,7 +71,7 @@ contract MasterBaker is Ownable {
     // the lpToken is the token contract for which a user wishes to provide liquidity, this could be USDC for example
     // this function can only be called by the contract owner who selects a token for which to provide liquidity
     function createLPpool(uint _allocPoint, IERC20 _lpToken ) public onlyOwner {
-
+        require(_lpToken != bread, "Cannot create another bread pool");
         uint256 _lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
