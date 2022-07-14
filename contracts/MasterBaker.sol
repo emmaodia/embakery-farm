@@ -4,12 +4,13 @@ pragma solidity ^0.8.14;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "./UGToken.sol";
 import "./BreadToken.sol";
 
-contract MasterBaker {
+contract MasterBaker is Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -74,12 +75,31 @@ contract MasterBaker {
         totalAllocPoint = 1000;
     }
 
-    // Deposit UGToken to earn BREAD per block
-    function depositToLPpool(uint256 _amount) public {
-        PoolInfo storage pool = poolInfo[0];
-        UserInfo storage user = userInfo[0][msg.sender];
+    function createStakingPool(uint _allocPoint, IERC20 _stakeToken)
+        public
+        onlyOwner
+    {
+        require(_stakeToken != bread, "Cannot create another bread pool");
+        uint256 _lastRewardBlock = block.number > startBlock
+            ? block.number
+            : startBlock;
+        totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        poolInfo.push(
+            PoolInfo({
+                stakedToken: _stakeToken,
+                allocPoint: _allocPoint,
+                lastRewardBlock: _lastRewardBlock,
+                accBreadPerShare: 0
+            })
+        );
+    }
 
-        updateRewards(0);
+    // Deposit UGToken to earn BREAD per block
+    function depositToken(uint256 _poolid, uint256 _amount) public {
+        PoolInfo storage pool = poolInfo[_poolid];
+        UserInfo storage user = userInfo[_poolid][msg.sender];
+
+        updateRewards(_poolid);
 
         pool.stakedToken.safeTransferFrom(
             address(msg.sender),
@@ -115,8 +135,8 @@ contract MasterBaker {
         emit Withdraw(msg.sender, _poolId, _amount);
     }
 
-    function updateRewards() public {
-        PoolInfo storage pool = poolInfo[0];
+    function updateRewards(uint256 _poolid) public {
+        PoolInfo storage pool = poolInfo[_poolid];
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
